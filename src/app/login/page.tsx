@@ -1,243 +1,445 @@
 'use client'
 
+import * as React from 'react'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { HardDrive, Mail, Lock, AlertCircle, Sun, Moon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { HardDrive, Mail, Lock, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
+import { Input } from '@/components/ui/input'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { useToast } from '@/components/ui/toast'
+import { useTheme } from '@/components/ThemeProvider'
 
 export default function LoginPage() {
   const router = useRouter()
+  const { toast } = useToast()
+  const { resolvedTheme, toggleTheme } = useTheme()
   const supabase = createClient()
 
   const [mode, setMode] = useState<'login' | 'register'>('login')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
+  // Giriş Formu State
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [loginLoading, setLoginLoading] = useState(false)
+  const [loginEmailError, setLoginEmailError] = useState<string | null>(null)
+  const [loginPasswordError, setLoginPasswordError] = useState<string | null>(null)
+  const [loginGeneralError, setLoginGeneralError] = useState<string | null>(null)
+
+  // Kayıt Formu State
+  const [registerEmail, setRegisterEmail] = useState('')
+  const [registerPassword, setRegisterPassword] = useState('')
+  const [registerLoading, setRegisterLoading] = useState(false)
+  const [registerEmailError, setRegisterEmailError] = useState<string | null>(null)
+  const [registerPasswordError, setRegisterPasswordError] = useState<string | null>(null)
+  const [registerGeneralError, setRegisterGeneralError] = useState<string | null>(null)
 
   function translateError(errorMsg: string): string {
     const lower = errorMsg.toLowerCase()
     if (lower.includes('invalid login credentials')) {
-      return 'E-posta veya şifre hatalı. Lütfen bilgilerinizi kontrol edin.'
+      return 'E-posta veya şifre hatalı.'
     }
     if (lower.includes('user already registered') || lower.includes('already exists')) {
-      return 'Bu e-posta adresiyle kayıtlı bir hesap zaten mevcut. Giriş yapmayı deneyin.'
+      return 'Bu e-posta adresiyle kayıtlı bir hesap zaten var.'
     }
     if (lower.includes('password should be at least')) {
-      return 'Şifreniz en az 6 karakter uzunluğunda olmalıdır.'
+      return 'Şifre en az 6 karakter olmalıdır.'
     }
     if (lower.includes('email not confirmed')) {
-      return 'E-posta adresiniz henüz doğrulanmamış. Lütfen gelen kutunuzu kontrol edin.'
+      return 'E-posta adresi henüz doğrulanmamış.'
     }
     if (lower.includes('invalid email') || lower.includes('valid email')) {
-      return 'Lütfen geçerli bir e-posta adresi girin.'
+      return 'Geçerli bir e-posta adresi girin.'
     }
     if (lower.includes('rate limit') || lower.includes('too many requests')) {
-      return 'Çok fazla deneme yapıldı. Lütfen biraz bekleyip tekrar deneyin.'
+      return 'Çok fazla deneme yapıldı. Lütfen biraz bekleyin.'
     }
-    return errorMsg || 'Bir hata oluştu. Lütfen tekrar deneyin.'
+    return errorMsg || 'İşlem gerçekleştirilemedi.'
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  // GİRİŞ YAP
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
-    setErrorMessage(null)
-    setSuccessMessage(null)
+    console.log('[LoginPage] handleLogin triggered:', { loginEmail, passLen: loginPassword?.length })
+    setLoginEmailError(null)
+    setLoginPasswordError(null)
+    setLoginGeneralError(null)
 
-    if (!email || !password) {
-      setErrorMessage('Lütfen tüm alanları doldurun.')
+    let hasError = false
+    const trimmedEmail = loginEmail.trim()
+
+    if (!trimmedEmail) {
+      setLoginEmailError('E-posta adresi gerekli.')
+      hasError = true
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setLoginEmailError('Geçerli bir e-posta adresi girin.')
+      hasError = true
+    }
+
+    if (!loginPassword) {
+      setLoginPasswordError('Şifre gerekli.')
+      hasError = true
+    } else if (loginPassword.length < 6) {
+      setLoginPasswordError('Şifre en az 6 karakter olmalıdır.')
+      hasError = true
+    }
+
+    if (hasError) {
+      toast({
+        title: 'Eksik veya hatalı bilgi',
+        description: 'Lütfen form alanlarını kontrol edin.',
+        variant: 'error',
+      })
       return
     }
 
-    if (password.length < 6) {
-      setErrorMessage('Şifreniz en az 6 karakter olmalıdır.')
-      return
-    }
-
-    setLoading(true)
+    setLoginLoading(true)
 
     try {
-      if (mode === 'login') {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password: loginPassword,
+      })
+      console.log('[LoginPage] signIn result:', { hasSession: Boolean(data?.session), error: error?.message })
+
+      if (error) {
+        const message = translateError(error.message)
+        setLoginGeneralError(message)
+        toast({
+          title: 'Giriş yapılamadı',
+          description: message,
+          variant: 'error',
         })
+        setLoginLoading(false)
+        return
+      }
 
-        if (error) {
-          setErrorMessage(translateError(error.message))
-          setLoading(false)
-          return
-        }
-
-        if (data.session) {
-          router.push('/drive')
-          router.refresh()
-        }
-      } else {
-        // Kayıt modu
-        const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
+      if (data.session) {
+        toast({
+          title: 'Giriş başarılı',
+          description: 'Yönlendiriliyorsunuz...',
+          variant: 'success',
         })
-
-        if (error) {
-          setErrorMessage(translateError(error.message))
-          setLoading(false)
-          return
-        }
-
-        // Supabase doğrudan oturum açtıysa /drive'a git, e-posta onayı açıksa bilgi ver
-        if (data.session) {
-          router.push('/drive')
-          router.refresh()
-        } else {
-          setSuccessMessage(
-            'Hesabınız başarıyla oluşturuldu! Supabase projenizde e-posta onayı aktifse lütfen gelen kutunuzu kontrol edin veya şimdi giriş yapmayı deneyin.'
-          )
-          setMode('login')
-          setLoading(false)
-        }
+        router.push('/drive')
+        router.refresh()
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Beklenmedik bir hata meydana geldi.'
-      setErrorMessage(translateError(msg))
-      setLoading(false)
+      const rawMessage = err instanceof Error ? err.message : 'Bağlantı hatası oluştu.'
+      const message = translateError(rawMessage)
+      setLoginGeneralError(message)
+      toast({
+        title: 'Giriş yapılamadı',
+        description: message,
+        variant: 'error',
+      })
+      setLoginLoading(false)
+    }
+  }
+
+  // KAYIT OL
+  async function handleRegister(e: React.FormEvent) {
+    e.preventDefault()
+    setRegisterEmailError(null)
+    setRegisterPasswordError(null)
+    setRegisterGeneralError(null)
+
+    let hasError = false
+    const trimmedEmail = registerEmail.trim()
+
+    if (!trimmedEmail) {
+      setRegisterEmailError('E-posta adresi gerekli.')
+      hasError = true
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setRegisterEmailError('Geçerli bir e-posta adresi girin.')
+      hasError = true
+    }
+
+    if (!registerPassword) {
+      setRegisterPasswordError('Şifre gerekli.')
+      hasError = true
+    } else if (registerPassword.length < 6) {
+      setRegisterPasswordError('Şifre en az 6 karakter olmalıdır.')
+      hasError = true
+    }
+
+    if (hasError) {
+      toast({
+        title: 'Eksik veya hatalı bilgi',
+        description: 'Lütfen form alanlarını kontrol edin.',
+        variant: 'error',
+      })
+      return
+    }
+
+    setRegisterLoading(true)
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: trimmedEmail,
+        password: registerPassword,
+      })
+
+      if (error) {
+        const message = translateError(error.message)
+        setRegisterGeneralError(message)
+        toast({
+          title: 'Kayıt yapılamadı',
+          description: message,
+          variant: 'error',
+        })
+        setRegisterLoading(false)
+        return
+      }
+
+      if (data.session) {
+        toast({
+          title: 'Kayıt başarılı',
+          description: 'Yönlendiriliyorsunuz...',
+          variant: 'success',
+        })
+        router.push('/drive')
+        router.refresh()
+      } else {
+        toast({
+          title: 'Kayıt tamamlandı',
+          description: 'Hesabınız oluşturuldu. Şimdi giriş yapabilirsiniz.',
+          variant: 'success',
+        })
+        setLoginEmail(trimmedEmail)
+        setMode('login')
+        setRegisterLoading(false)
+      }
+    } catch (err: unknown) {
+      const rawMessage = err instanceof Error ? err.message : 'Bağlantı hatası oluştu.'
+      const message = translateError(rawMessage)
+      setRegisterGeneralError(message)
+      toast({
+        title: 'Kayıt yapılamadı',
+        description: message,
+        variant: 'error',
+      })
+      setRegisterLoading(false)
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-gray-100 to-blue-50 px-4 py-12 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-8 rounded-2xl bg-white p-8 shadow-xl border border-gray-100">
-        {/* Başlık ve Logo */}
-        <div className="text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md">
-            <HardDrive className="h-7 w-7" />
+    <div className="relative min-h-screen flex flex-col items-center justify-center p-4 bg-bg-base">
+      {/* Sağ Üst Tema Değiştirici */}
+      <div className="absolute top-4 right-4">
+        <IconButton
+          variant="ghost"
+          size="sm"
+          onClick={toggleTheme}
+          aria-label={resolvedTheme === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'}
+          title={resolvedTheme === 'dark' ? 'Açık tema' : 'Koyu tema'}
+        >
+          {resolvedTheme === 'dark' ? (
+            <Sun className="h-4 w-4 text-text-secondary" strokeWidth={1.75} />
+          ) : (
+            <Moon className="h-4 w-4 text-text-secondary" strokeWidth={1.75} />
+          )}
+        </IconButton>
+      </div>
+
+      <div className="w-full max-w-[360px] rounded-[8px] border border-border-default bg-bg-surface p-6 shadow-dropdown">
+        {/* Logo ve Başlık */}
+        <div className="flex items-center gap-2.5 mb-1.5">
+          <div className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-border-default bg-bg-subtle text-text-primary">
+            <HardDrive className="h-4 w-4" strokeWidth={1.75} />
           </div>
-          <h2 className="mt-4 text-2xl font-bold tracking-tight text-gray-900">
+          <span className="text-base font-medium text-text-primary tracking-tight">
             Mini Drive
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Güvenli, hızlı ve kullanımı kolay bulut dosya depolama
-          </p>
+          </span>
         </div>
+        <p className="text-xs text-text-secondary mb-5">
+          Bulut dosya depolama ve yönetim alanı
+        </p>
 
-        {/* Sekmeler (Giriş Yap / Kayıt Ol) */}
-        <div className="flex rounded-xl bg-gray-100 p-1">
-          <button
-            type="button"
-            onClick={() => {
-              setMode('login')
-              setErrorMessage(null)
-              setSuccessMessage(null)
-            }}
-            className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
-              mode === 'login'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-900'
-            }`}
-          >
-            Giriş Yap
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode('register')
-              setErrorMessage(null)
-              setSuccessMessage(null)
-            }}
-            className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
-              mode === 'register'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-900'
-            }`}
-          >
-            Kayıt Ol
-          </button>
-        </div>
+        {/* Sekmeler */}
+        <Tabs
+          value={mode}
+          onValueChange={(val) => setMode(val as 'login' | 'register')}
+          className="w-full"
+        >
+          <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsTrigger value="login" onClick={() => setMode('login')}>
+              Giriş Yap
+            </TabsTrigger>
+            <TabsTrigger value="register" onClick={() => setMode('register')}>
+              Kayıt Ol
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Bildirim Kutuları */}
-        {errorMessage && (
-          <div className="flex items-start gap-2.5 rounded-lg bg-red-50 p-3.5 text-sm text-red-700 border border-red-200">
-            <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-500 mt-0.5" />
-            <span>{errorMessage}</span>
-          </div>
-        )}
-
-        {successMessage && (
-          <div className="flex items-start gap-2.5 rounded-lg bg-emerald-50 p-3.5 text-sm text-emerald-700 border border-emerald-200">
-            <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-emerald-500 mt-0.5" />
-            <span>{successMessage}</span>
-          </div>
-        )}
-
-        {/* Form */}
-        <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-          <div>
-            <label
-              htmlFor="email"
-              className="block text-xs font-semibold uppercase tracking-wider text-gray-700"
-            >
-              E-posta Adresi
-            </label>
-            <div className="relative mt-1">
-              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-                <Mail className="h-5 w-5" />
+          {/* GİRİŞ YAP SEKME İÇERİĞİ */}
+          <TabsContent value="login" className="mt-0 space-y-3.5">
+            <form id="login-form" onSubmit={handleLogin} noValidate className="space-y-3.5">
+              <div>
+                <label
+                  htmlFor="login-email"
+                  className="block text-xs font-medium text-text-secondary mb-1.5"
+                >
+                  E-posta
+                </label>
+                <Input
+                  id="login-email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="ad@ornek.com"
+                  value={loginEmail}
+                  disabled={loginLoading}
+                  error={Boolean(loginEmailError || loginGeneralError)}
+                  onChange={(e) => {
+                    setLoginEmail(e.target.value)
+                    if (loginEmailError) setLoginEmailError(null)
+                    if (loginGeneralError) setLoginGeneralError(null)
+                  }}
+                  prefixIcon={<Mail className="h-3.5 w-3.5" strokeWidth={1.75} />}
+                />
+                {loginEmailError && (
+                  <p className="text-xs text-danger mt-1 leading-tight">
+                    {loginEmailError}
+                  </p>
+                )}
               </div>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="adiniz@ornek.com"
-                className="block w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              />
-            </div>
-          </div>
 
-          <div>
-            <label
-              htmlFor="password"
-              className="block text-xs font-semibold uppercase tracking-wider text-gray-700"
-            >
-              Şifre
-            </label>
-            <div className="relative mt-1">
-              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-                <Lock className="h-5 w-5" />
+              <div>
+                <label
+                  htmlFor="login-password"
+                  className="block text-xs font-medium text-text-secondary mb-1.5"
+                >
+                  Şifre
+                </label>
+                <Input
+                  id="login-password"
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  value={loginPassword}
+                  disabled={loginLoading}
+                  error={Boolean(loginPasswordError || loginGeneralError)}
+                  onChange={(e) => {
+                    setLoginPassword(e.target.value)
+                    if (loginPasswordError) setLoginPasswordError(null)
+                    if (loginGeneralError) setLoginGeneralError(null)
+                  }}
+                  prefixIcon={<Lock className="h-3.5 w-3.5" strokeWidth={1.75} />}
+                />
+                {loginPasswordError && (
+                  <p className="text-xs text-danger mt-1 leading-tight">
+                    {loginPasswordError}
+                  </p>
+                )}
               </div>
-              <input
-                id="password"
-                type="password"
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="block w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              />
-            </div>
-            <p className="mt-1 text-xs text-gray-400">En az 6 karakter olmalıdır.</p>
-          </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex w-full items-center justify-center rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:opacity-50"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Lütfen bekleyin...
-              </>
-            ) : mode === 'login' ? (
-              'Giriş Yap'
-            ) : (
-              'Hesap Oluştur'
-            )}
-          </button>
-        </form>
+              {loginGeneralError && (
+                <div
+                  role="alert"
+                  className="flex items-start gap-2 rounded-[6px] border border-danger-border bg-danger-subtle p-2.5 text-xs text-danger"
+                >
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" strokeWidth={1.75} />
+                  <span className="leading-tight">{loginGeneralError}</span>
+                </div>
+              )}
+
+              <Button
+                id="login-submit-btn"
+                type="submit"
+                variant="primary"
+                loading={loginLoading}
+                disabled={loginLoading}
+                className="w-full mt-2"
+              >
+                {loginLoading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
+              </Button>
+            </form>
+          </TabsContent>
+
+          {/* KAYIT OL SEKME İÇERİĞİ */}
+          <TabsContent value="register" className="mt-0 space-y-3.5">
+            <form id="register-form" onSubmit={handleRegister} noValidate className="space-y-3.5">
+              <div>
+                <label
+                  htmlFor="register-email"
+                  className="block text-xs font-medium text-text-secondary mb-1.5"
+                >
+                  E-posta
+                </label>
+                <Input
+                  id="register-email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="ad@ornek.com"
+                  value={registerEmail}
+                  disabled={registerLoading}
+                  error={Boolean(registerEmailError || registerGeneralError)}
+                  onChange={(e) => {
+                    setRegisterEmail(e.target.value)
+                    if (registerEmailError) setRegisterEmailError(null)
+                    if (registerGeneralError) setRegisterGeneralError(null)
+                  }}
+                  prefixIcon={<Mail className="h-3.5 w-3.5" strokeWidth={1.75} />}
+                />
+                {registerEmailError && (
+                  <p className="text-xs text-danger mt-1 leading-tight">
+                    {registerEmailError}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label
+                  htmlFor="register-password"
+                  className="block text-xs font-medium text-text-secondary mb-1.5"
+                >
+                  Şifre
+                </label>
+                <Input
+                  id="register-password"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="En az 6 karakter"
+                  value={registerPassword}
+                  disabled={registerLoading}
+                  error={Boolean(registerPasswordError || registerGeneralError)}
+                  onChange={(e) => {
+                    setRegisterPassword(e.target.value)
+                    if (registerPasswordError) setRegisterPasswordError(null)
+                    if (registerGeneralError) setRegisterGeneralError(null)
+                  }}
+                  prefixIcon={<Lock className="h-3.5 w-3.5" strokeWidth={1.75} />}
+                />
+                {registerPasswordError && (
+                  <p className="text-xs text-danger mt-1 leading-tight">
+                    {registerPasswordError}
+                  </p>
+                )}
+              </div>
+
+              {registerGeneralError && (
+                <div
+                  role="alert"
+                  className="flex items-start gap-2 rounded-[6px] border border-danger-border bg-danger-subtle p-2.5 text-xs text-danger"
+                >
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" strokeWidth={1.75} />
+                  <span className="leading-tight">{registerGeneralError}</span>
+                </div>
+              )}
+
+              <Button
+                id="register-submit-btn"
+                type="submit"
+                variant="primary"
+                loading={registerLoading}
+                disabled={registerLoading}
+                className="w-full mt-2"
+              >
+                {registerLoading ? 'Kayıt olunuyor...' : 'Kayıt Ol'}
+              </Button>
+            </form>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   )

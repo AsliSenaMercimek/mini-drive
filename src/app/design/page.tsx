@@ -7,21 +7,16 @@ import {
   Search,
   Plus,
   Trash2,
-  FolderPlus,
   Share2,
   Download,
   MoreHorizontal,
-  FileText,
   Clock,
-  Sparkles,
   HardDrive,
-  Check,
   UploadCloud,
   Layers,
   Palette,
   Type,
   LayoutGrid,
-  Command,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { Button } from "@/components/ui/button";
@@ -58,7 +53,6 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
-  ContextMenuShortcut,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import {

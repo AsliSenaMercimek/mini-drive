@@ -1,9 +1,15 @@
 'use client'
 
+import * as React from 'react'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { HardDrive, LogOut, Sun, Moon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { HardDrive, LogOut, User as UserIcon } from 'lucide-react'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
+import { useToast } from '@/components/ui/toast'
+import { useTheme } from '@/components/ThemeProvider'
 
 interface HeaderProps {
   userEmail?: string | null
@@ -11,6 +17,8 @@ interface HeaderProps {
 
 export function Header({ userEmail }: HeaderProps) {
   const router = useRouter()
+  const { toast } = useToast()
+  const { resolvedTheme, toggleTheme } = useTheme()
   const [loggingOut, setLoggingOut] = useState(false)
   const supabase = createClient()
 
@@ -18,56 +26,75 @@ export function Header({ userEmail }: HeaderProps) {
     try {
       setLoggingOut(true)
       await supabase.auth.signOut()
+      toast({
+        title: 'Çıkış yapıldı',
+        description: 'Oturumunuz sonlandırıldı.',
+        variant: 'default',
+      })
       router.push('/login')
       router.refresh()
-    } catch (err) {
-      console.error('Çıkış hatası:', err)
+    } catch {
       setLoggingOut(false)
+      toast({
+        title: 'Çıkış yapılamadı',
+        description: 'Lütfen tekrar deneyin.',
+        variant: 'error',
+      })
     }
   }
 
+  const initial = userEmail ? userEmail.charAt(0).toUpperCase() : '?'
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/80 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-40 w-full border-b border-border-subtle bg-bg-surface">
+      <div className="mx-auto flex h-12 max-w-5xl items-center justify-between px-4 sm:px-6">
         {/* Logo / Marka */}
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
-            <HardDrive className="h-5 w-5" />
+        <div className="flex items-center gap-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded-[6px] border border-border-default bg-bg-subtle text-text-primary">
+            <HardDrive className="h-3.5 w-3.5" strokeWidth={1.75} />
           </div>
-          <div>
-            <span className="text-lg font-bold tracking-tight text-gray-900">
-              Mini Drive
-            </span>
-            <span className="hidden sm:inline-block ml-2 text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-              Bulut Depolama
-            </span>
-          </div>
+          <span className="text-sm font-medium text-text-primary tracking-tight">
+            Mini Drive
+          </span>
         </div>
 
-        {/* Kullanıcı Bilgisi ve Çıkış Butonu */}
-        <div className="flex items-center gap-3">
+        {/* Sağ Alan: Tema, Kullanıcı Bilgisi, Çıkış Butonu */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          <IconButton
+            variant="ghost"
+            size="sm"
+            onClick={toggleTheme}
+            aria-label={resolvedTheme === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'}
+            title={resolvedTheme === 'dark' ? 'Açık tema' : 'Koyu tema'}
+          >
+            {resolvedTheme === 'dark' ? (
+              <Sun className="h-4 w-4 text-text-secondary" strokeWidth={1.75} />
+            ) : (
+              <Moon className="h-4 w-4 text-text-secondary" strokeWidth={1.75} />
+            )}
+          </IconButton>
+
           {userEmail && (
-            <div className="flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-700">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-xs font-semibold uppercase">
-                {userEmail.charAt(0)}
-              </span>
-              <span className="max-w-[150px] sm:max-w-[220px] truncate">
+            <div className="flex items-center gap-2">
+              <Avatar size="sm">
+                <AvatarFallback>{initial}</AvatarFallback>
+              </Avatar>
+              <span className="text-xs text-text-secondary max-w-[120px] sm:max-w-[200px] truncate">
                 {userEmail}
               </span>
             </div>
           )}
 
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={handleSignOut}
+            loading={loggingOut}
             disabled={loggingOut}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-red-600 disabled:opacity-50"
-            title="Oturumu Kapat"
           >
-            <LogOut className="h-4 w-4" />
-            <span className="hidden sm:inline">
-              {loggingOut ? 'Çıkış yapılıyor...' : 'Çıkış Yap'}
-            </span>
-          </button>
+            <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
+            <span className="hidden sm:inline">Çıkış Yap</span>
+          </Button>
         </div>
       </div>
     </header>

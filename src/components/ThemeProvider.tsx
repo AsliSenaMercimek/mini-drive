@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useSyncExternalStore } from "react";
 
 type Theme = "light" | "dark" | "system";
 
@@ -13,43 +13,58 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("light");
-  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
+function getSystemTheme(): "light" | "dark" {
+  if (typeof window === "undefined") return "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
 
-  useEffect(() => {
-    const saved = localStorage.getItem("mini-drive-theme") as Theme | null;
-    if (saved && (saved === "light" || saved === "dark" || saved === "system")) {
-      setTheme(saved);
+function subscribeToSystemTheme(callback: () => void) {
+  if (typeof window === "undefined") return () => {};
+  const media = window.matchMedia("(prefers-color-scheme: dark)");
+  media.addEventListener("change", callback);
+  return () => media.removeEventListener("change", callback);
+}
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [theme, setThemeState] = useState<Theme>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("mini-drive-theme") as Theme | null;
+      if (saved === "light" || saved === "dark" || saved === "system") {
+        return saved;
+      }
     }
-  }, []);
+    return "light";
+  });
+
+  const systemTheme = useSyncExternalStore<"light" | "dark">(
+    subscribeToSystemTheme,
+    getSystemTheme,
+    () => "light"
+  );
+
+  const resolvedTheme: "light" | "dark" =
+    theme === "system" ? systemTheme : theme === "dark" ? "dark" : "light";
+
+  const setTheme = (nextTheme: Theme) => {
+    setThemeState(nextTheme);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("mini-drive-theme", nextTheme);
+    }
+  };
 
   useEffect(() => {
     const root = document.documentElement;
-    let effective: "light" | "dark" = "light";
-
-    if (theme === "system") {
-      const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      effective = systemDark ? "dark" : "light";
-    } else {
-      effective = theme;
-    }
-
-    setResolvedTheme(effective);
-
-    if (effective === "dark") {
+    if (resolvedTheme === "dark") {
       root.classList.add("dark");
       root.classList.remove("light");
     } else {
       root.classList.remove("dark");
       root.classList.add("light");
     }
-
-    localStorage.setItem("mini-drive-theme", theme);
-  }, [theme]);
+  }, [resolvedTheme]);
 
   const toggleTheme = () => {
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+    setTheme(resolvedTheme === "dark" ? "light" : "dark");
   };
 
   return (

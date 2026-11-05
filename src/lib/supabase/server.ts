@@ -3,8 +3,12 @@ import { cookies } from 'next/headers'
 
 export async function createClient() {
   const cookieStore = await cookies()
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder'
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase ortam değişkenleri tanımlanmamış: NEXT_PUBLIC_SUPABASE_URL veya NEXT_PUBLIC_SUPABASE_ANON_KEY')
+  }
 
   return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
@@ -17,8 +21,8 @@ export async function createClient() {
             cookieStore.set(name, value, options)
           )
         } catch {
-          // Server component render sırasında setAll çağrılırsa hata fırlatabilir.
-          // Oturum yenileme işlemleri middleware tarafından karşılanır.
+          // Server Component içinde çalışırken çerez ayarlanamaz;
+          // oturum yenilemesi middleware tarafından yönetilir.
         }
       },
     },

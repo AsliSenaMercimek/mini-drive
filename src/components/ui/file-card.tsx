@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Download, MoreHorizontal, Share2 } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FileIcon } from "@/components/ui/file-icon";

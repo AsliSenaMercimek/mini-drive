@@ -6,8 +6,12 @@ export async function updateSession(request: NextRequest) {
     request,
   })
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder'
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return supabaseResponse
+  }
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
@@ -26,21 +30,26 @@ export async function updateSession(request: NextRequest) {
     },
   })
 
-  // IMPORTANT: getUser() çağrısı hem session'ı doğrular hem de süresi dolmuşsa yeniler
+  // getUser() oturumu doğrular ve süresi dolmuşsa yeniler
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   const pathname = request.nextUrl.pathname
 
-  // Giriş yapmamış kullanıcıyı korumalı sayfalardan /login sayfasına yönlendir (/design hariç)
-  if (!user && !pathname.startsWith('/login') && !pathname.startsWith('/auth') && !pathname.startsWith('/design')) {
+  // Giriş yapmamış kullanıcıyı korumalı sayfalardan /login sayfasına yönlendir
+  if (
+    !user &&
+    !pathname.startsWith('/login') &&
+    !pathname.startsWith('/auth') &&
+    !pathname.startsWith('/design')
+  ) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  // Giriş yapmış kullanıcı /login sayfasına veya ana sayfaya giderse /drive'a yönlendir
+  // Giriş yapmış kullanıcı /login veya / sayfasına erişirse /drive'a yönlendir
   if (user && (pathname === '/login' || pathname === '/')) {
     const url = request.nextUrl.clone()
     url.pathname = '/drive'
