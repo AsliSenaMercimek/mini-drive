@@ -33,8 +33,8 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
 
-  // Giriş yapmamış kullanıcıyı korumalı sayfalardan /login sayfasına yönlendir
-  if (!user && !pathname.startsWith('/login') && !pathname.startsWith('/auth')) {
+  // Giriş yapmamış kullanıcıyı korumalı sayfalardan /login sayfasına yönlendir (/design hariç)
+  if (!user && !pathname.startsWith('/login') && !pathname.startsWith('/auth') && !pathname.startsWith('/design')) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
